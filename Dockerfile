@@ -28,7 +28,7 @@
 # Multistage build.
 #
 
-ARG BASE_IMAGE=nvcr.io/nvidia/tensorrtserver:19.01-py3
+ARG BASE_IMAGE=nvcr.io/nvidia/tensorrtserver:19.02-py3
 ARG PYTORCH_IMAGE=nvcr.io/nvidia/pytorch:19.01-py3
 ARG TENSORFLOW_IMAGE=nvcr.io/nvidia/tensorflow:19.01-py3
 
@@ -70,21 +70,16 @@ WORKDIR /opt/pytorch
 RUN pip uninstall -y torch
 RUN bash -c 'if [ "$BUILD_CLIENTS_ONLY" != "1" ]; then \
                cd pytorch && \
-               TORCH_CUDA_ARCH_LIST="5.2 6.0 6.1 7.0 7.5+PTX" \
+               TORCH_CUDA_ARCH_LIST="7.0 7.5+PTX" \
                 CMAKE_PREFIX_PATH="$(dirname $(which conda))/../" \
                 NCCL_INCLUDE_DIR="/usr/include/" \
                 NCCL_LIB_DIR="/usr/lib/" \
-                NO_DISTRIBUTED=1 NO_TEST=1 NO_MIOPEN=1 USE_OPENCV=OFF USE_LEVELDB=OFF \
+                NO_DISTRIBUTED=1 NO_TEST=1 NO_MIOPEN=1 USE_OPENCV=OFF USE_TENSORRT=ON USE_LEVELDB=OFF \
                 python setup.py install && python setup.py clean; \
              else \
                mkdir -p /opt/conda/lib/python3.6/site-packages/torch/lib; \
                mkdir -p /opt/conda/lib; \
-               touch /opt/conda/lib/python3.6/site-packages/torch/lib/libcaffe2_detectron_ops_gpu.so; \
-               touch /opt/conda/lib/python3.6/site-packages/torch/lib/libcaffe2.so; \
-               touch /opt/conda/lib/python3.6/site-packages/torch/lib/libcaffe2_gpu.so; \
-               touch /opt/conda/lib/python3.6/site-packages/torch/lib/libc10.so; \
-               touch /opt/conda/lib/python3.6/site-packages/torch/lib/libc10_cuda.so; \
-               touch /opt/conda/lib/python3.6/site-packages/torch/lib/libmkldnn.so.0; \
+               touch /opt/conda/lib/python3.6/site-packages/torch/lib/*; \
                touch /opt/conda/lib/libmkl_avx2.so; \
                touch /opt/conda/lib/libmkl_core.so; \
                touch /opt/conda/lib/libmkl_def.so; \
@@ -113,7 +108,11 @@ RUN apt-get update && \
             libcurl3-dev \
             libopencv-dev \
             libopencv-core-dev \
-            libtool
+            libtool \
+	    libgoogle-glog-dev \
+	    libprotobuf-dev \
+	    emacs-nox \
+	    
 
 RUN curl -O https://bootstrap.pypa.io/get-pip.py && \
     python$PYVER get-pip.py && \
@@ -123,22 +122,7 @@ RUN pip install --upgrade setuptools
 
 # Caffe2 library requirements...
 COPY --from=trtserver_caffe2 \
-     /opt/conda/lib/python3.6/site-packages/torch/lib/libcaffe2_detectron_ops_gpu.so \
-     /opt/tensorrtserver/lib/
-COPY --from=trtserver_caffe2 \
-     /opt/conda/lib/python3.6/site-packages/torch/lib/libcaffe2.so \
-     /opt/tensorrtserver/lib/
-COPY --from=trtserver_caffe2 \
-     /opt/conda/lib/python3.6/site-packages/torch/lib/libcaffe2_gpu.so \
-     /opt/tensorrtserver/lib/
-COPY --from=trtserver_caffe2 \
-     /opt/conda/lib/python3.6/site-packages/torch/lib/libc10.so \
-     /opt/tensorrtserver/lib/
-COPY --from=trtserver_caffe2 \
-     /opt/conda/lib/python3.6/site-packages/torch/lib/libc10_cuda.so \
-     /opt/tensorrtserver/lib/
-COPY --from=trtserver_caffe2 \
-     /opt/conda/lib/python3.6/site-packages/torch/lib/libmkldnn.so.0 \
+     /opt/conda/lib/python3.6/site-packages/torch/lib/ \
      /opt/tensorrtserver/lib/
 COPY --from=trtserver_caffe2 /opt/conda/lib/libmkl_avx2.so /opt/tensorrtserver/lib/
 COPY --from=trtserver_caffe2 /opt/conda/lib/libmkl_core.so /opt/tensorrtserver/lib/
